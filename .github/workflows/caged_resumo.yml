@@ -1,0 +1,47 @@
+# Pipeline do CAGED - Etapa 2: gera caged_resumo.csv e faz commit no repositorio.
+#
+# Quando roda:
+#   - manualmente (aba Actions > "CAGED - resumo 12 meses" > Run workflow)
+#   - sozinho, no dia 5 de janeiro e de julho (inicio de cada semestre)
+
+name: CAGED - resumo 12 meses
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 12 5 1,7 *"   # 12:17 UTC = 09:17 em Brasilia
+
+permissions:
+  contents: write   # necessario para o Action fazer commit do CSV
+
+jobs:
+  resumo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Baixar o codigo do repositorio
+        uses: actions/checkout@v5
+
+      - name: Instalar Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Instalar bibliotecas
+        run: pip install pandas py7zr
+
+      - name: Gerar o resumo do CAGED
+        run: python caged_resumo.py
+
+      - name: Salvar o CSV no repositorio
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add caged_resumo.csv
+          if git diff --cached --quiet; then
+            echo "CSV sem mudancas, nada para salvar."
+          else
+            git commit -m "Atualiza caged_resumo.csv ($(date -u +%Y-%m-%d))"
+            git push
+          fi
