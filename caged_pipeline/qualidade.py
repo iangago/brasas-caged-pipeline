@@ -67,7 +67,8 @@ def relatorio(resumo: pd.DataFrame, saldo_mensal: pd.DataFrame,
         "",
         "## Top 10 ocupacoes por admissoes",
         "",
-        resumo.head(10).to_markdown(index=False),
+        resumo.head(10)[["cbo_ocupacao", "nome_ocupacao", "admissoes", "saldo",
+                         "taxa_saldo", "salario_mediano_admissao"]].to_markdown(index=False),
         "",
     ]
     return "\n".join(linhas)
