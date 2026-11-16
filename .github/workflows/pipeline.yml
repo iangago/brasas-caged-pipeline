@@ -1,0 +1,60 @@
+# Pipeline do Novo CAGED
+#   - Todo push: roda os testes.
+#   - Agendado (5 de janeiro e 5 de julho) ou manual: testes -> pipeline -> commit dos dados.
+
+name: Pipeline CAGED
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["dados/**", "**.md"]
+  workflow_dispatch:
+  schedule:
+    - cron: "17 12 5 1,7 *"   # 12:17 UTC = 09:17 em Brasilia, inicio de cada semestre
+
+permissions:
+  contents: write   # para o job de pipeline fazer commit de dados/
+
+concurrency:
+  group: pipeline-caged
+  cancel-in-progress: false
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m pytest -v
+
+  pipeline:
+    needs: testes
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Extrair, transformar e validar
+        run: python pipeline.py
+
+      - name: Publicar dados no repositorio
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dados/
+          if git diff --cached --quiet; then
+            echo "Dados sem mudancas."
+          else
+            git commit -m "dados: atualiza resumo do CAGED ($(date -u +%Y-%m-%d))"
+            git push
+          fi
