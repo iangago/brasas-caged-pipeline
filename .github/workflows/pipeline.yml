@@ -10,7 +10,8 @@ on:
     paths-ignore: ["dados/**", "**.md"]
   workflow_dispatch:
   schedule:
-    - cron: "17 12 5 1,7 *"   # 12:17 UTC = 09:17 em Brasilia, inicio de cada semestre
+    - cron: "17 12 5 1,7 *"   # pipeline: 12:17 UTC = 09:17 em Brasilia, inicio de cada semestre
+    - cron: "41 11 1 * *"     # keepalive: todo dia 1, mantem o agendamento ativo
 
 permissions:
   contents: write   # para o job de pipeline fazer commit de dados/
@@ -20,7 +21,21 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # O GitHub desativa workflows agendados de repositorio publico apos 60 dias sem
+  # atividade. Como o pipeline so roda a cada 6 meses, este job reativa o workflow todo mes.
+  keepalive:
+    if: github.event.schedule == '41 11 1 * *'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Reativar o agendamento
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/pipeline.yml/enable"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
   testes:
+    if: github.event.schedule != '41 11 1 * *'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -33,7 +48,7 @@ jobs:
 
   pipeline:
     needs: testes
-    if: github.event_name != 'push'
+    if: github.event_name != 'push' && github.event.schedule != '41 11 1 * *'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
